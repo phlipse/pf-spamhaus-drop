@@ -1,0 +1,59 @@
+#!/bin/sh
+# Copyright (c) 2017 Philipp Weber
+# Use of this source code is governed by the MIT license
+# which can be found in the repositorys LICENSE file.
+
+# If there is a global system configuration file, suck it in.
+#
+if [ -r /etc/defaults/periodic.conf ]
+then
+    . /etc/defaults/periodic.conf
+    source_periodic_confs
+fi
+
+case "$daily_pf_spamhaus_drop_enable" in
+    [Yy][Ee][Ss])
+	echo ""
+	echo "Download Spamhaus DROP lists:"
+
+	TABLE=/etc/pf.spamhausdrop
+	TMPDROP=/tmp/spamhaus.drop.$$
+	TMPEDROP=/tmp/spamhaus.edrop.$$
+	TMPDROPV6=/tmp/spamhaus.dropv6.$$
+	DROPURL='https://www.spamhaus.org/drop/drop.txt'
+	EDROPURL='https://www.spamhaus.org/drop/edrop.txt'
+	DROPV6URL='https://www.spamhaus.org/drop/dropv6.txt'
+
+	CUT=/usr/bin/cut
+	SED=/usr/bin/sed
+	FETCH=/usr/bin/fetch
+	RM=/bin/rm
+	PF="/sbin/pfctl -Tl -f /etc/pf.conf"
+
+	>$TMPDROP
+	>$TMPEDROP
+
+	$FETCH -o $TMPDROP $DROPURL >/dev/null 2>&1
+	$FETCH -o $TMPEDROP $EDROPURL >/dev/null 2>&1
+
+	# check for ipv6
+	case "$daily_pf_spamhaus_drop_ipv6" in
+    [Yy][Ee][Ss])
+		echo "IPv6 support is enabled."
+		>$TMPDROPV6
+		$FETCH -o $TMPDROPV6 $DROPV6URL >/dev/null 2>&1
+	esac
+
+	$CUT -d';' -f1 $TMPDROP $TMPEDROP $TMPDROPV6 2>/dev/null | $SED -e '/^$/d' >$TABLE
+
+	$RM -f $TMPDROP $TMPEDROP $TMPDROPV6
+
+	COUNT=$(echo `cat $TABLE | wc -l`)
+	echo "Loaded $COUNT IPs to table $TABLE."
+
+	$PF && rc=1 || rc=3
+	[ $rc -eq 1 ] && echo "Successfully reloaded pf tables." || echo "Error while reloading pf tables!"
+	;;
+    *) rc=0;;
+esac
+exit $rc
