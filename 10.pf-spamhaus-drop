@@ -49,7 +49,7 @@ case "$daily_pf_spamhaus_drop_enable" in
 	$RM -f $TMPDROP $TMPEDROP $TMPDROPV6
 
 	COUNT=$(echo `cat $TABLE | wc -l`)
-	echo "Loaded $COUNT IPs to table $TABLE."
+	echo "$COUNT IPs loaded to table $TABLE."
 
 	$PF && rc=1 || rc=3
 	[ $rc -eq 1 ] && echo "Successfully reloaded pf tables." || echo "Error while reloading pf tables!"
